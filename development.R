@@ -26,9 +26,15 @@ find.MPT.params(mp)
 check.MPT.probabilities(mp)
 
 ### Example 2
+?TreeBUGS::traitMPT
 EQNfile <- system.file("MPTmodels/2htsm.eqn", package = "TreeBUGS")
 tmp <- read_mpt(EQNfile)
 
 mp <- parse_model_df(tmp)
 find.MPT.params(mp)
 check.MPT.probabilities(mp)
+
+##  install.packages("randtoolbox")
+## install.packages("fastGHQuad")
+
+install.packages("rtmb_try/mptmem_0.04.tar.gz", repos = NULL, type = "source")
