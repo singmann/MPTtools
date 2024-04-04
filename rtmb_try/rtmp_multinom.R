@@ -114,36 +114,15 @@ opt <- nlminb(obj$par, obj$fn)
 sdr <- sdreport(obj)
 sdr
 # sdreport(.) result
-#     Estimate  Std. Error
-# p1 0.1279800 0.001493956
-# p2 0.7446848 0.002088208
-# Maximum gradient component: 0.001377594
+#    Estimate  Std. Error
+# p1 0.138600 0.004886402
+# p2 0.730671 0.006759472
+# Maximum gradient component: 0.0005182904
 
 
-
-#### check Bayesian method
-
-library("TreeBUGS") ## uses JAGS
-model <- "
-T1 V1 p1
-T1 V2 (1-p1)*p2
-T1 V3 (1-p1)*(1-p2)
-"
-df <- as.data.frame(dat)
-m1 <- traitMPT(model, df)
-summary(m1) ## recovers parameter very well
-# Group-level medians of MPT parameters (probability scale):
-#          Mean    SD  2.5%   50% 97.5% Time-series SE n.eff  Rhat R_95%
-# mean_p1 0.102 0.004 0.093 0.102 0.111          0.000   367 1.007 1.020
-# mean_p2 0.802 0.010 0.782 0.802 0.822          0.001   142 1.054 1.174
-# Standard deviation of latent-trait values (probit scale) across individuals:
-#                  Mean    SD  2.5%   50% 97.5% Time-series SE n.eff  Rhat R_95%
-# latent_sigma_p1 0.508 0.019 0.472 0.508 0.547              0  8554 1.004 1.014
-# latent_sigma_p2 0.813 0.029 0.758 0.812 0.871              0  7707 1.000 1.001
-
-
+### also works
 fun <- function(parms) {
-  getAll(parms, datlist, warn=FALSE)
+  getAll(parms, dat_single, warn=FALSE)
   datu <- OBS(datu)
   prob <- c(
     p1,
@@ -152,56 +131,35 @@ fun <- function(parms) {
   )
 
   nll <- 0
-  nll <- nll - dmultinom(datu[,1], prob=prob, log=TRUE)
+  nll <- nll - dmultinom(datu, prob=prob, log=TRUE)
   nll
 }
+fun(par_single)
+obj2 <- MakeADFun(fun, par_single)
+nlminb(obj2$par, obj2$fn)
+sdr2 <- sdreport(obj2)
+sdr2
 
-
+### does not work:
+# Error in prob < 0 : invalid comparison with complex values
 fun1 <- function(parms) {
-  getAll(parms, datlist, warn=FALSE)
+  getAll(parms, dat_single, warn=FALSE)
   datu <- OBS(datu)
   prob <- rep(NA_real_, 3)
   prob[1] <- p1
   prob[2] <- (1 - p1) * p2
   prob[3] <- (1 - p1) * (1 - p2)
-  prob <- as.numeric(prob)
+  #prob <- as.numeric(prob)
 
   nll <- 0
   nll <- nll - dmultinom(datu, prob=prob, log=TRUE)
   nll
 }
 
-fun1(par1)
+fun1(par_single)
 
-obj <- MakeADFun(fun1, par1)
+obj <- MakeADFun(fun1, par_single)
 opt <- nlminb(obj$par, obj$fn, obj$gr)
-
 sdr <- sdreport(obj)
 sdr
 
-
-set.seed(1) ## For checkConsistency
-dat <- list(x=c(1:10,10:1))
-f <- function(parms) {
-    getAll(dat, parms, warn=FALSE)
-    x <- OBS(x)
-    prob <- sin( p * (1:10) ) + 1
-    prob <- prob / sum(prob)
-    ans <- -dmultinom(x[1:10], prob=prob, log=TRUE)
-    ans <- ans - dmultinom(x[-(1:10)], prob=prob, log=TRUE)
-    ans
-}
-###############################################
-
-parms <- list(p=.2)
-f(parms)
-obj <- MakeADFun(f, parms)
-expect_true(abs(obj$fn() - f(parms)) < tol)
-s <- obj$simulate()
-expect_true(length(s$x) == length(dat$x))
-res1 <- oneStepPredict(obj,method="cdf",discrete=TRUE,trace=FALSE)
-res2 <- oneStepPredict(obj,method="oneStepGeneric",discrete=TRUE,discreteSupport=0:55,trace=FALSE)
-expect_true(max(abs(res1$res-res2$res)) < tol)
-chk.dmultinom <- checkConsistency(obj)
-expect_true(abs(summary(chk.dmultinom)$joint$p.value)>.05)
-expect_true(abs(summary(chk.dmultinom)$joint$bias)<.05)

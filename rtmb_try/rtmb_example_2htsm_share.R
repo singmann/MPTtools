@@ -3,32 +3,6 @@ library("RTMB")
 
 data(arnold2013, package = "TreeBUGS")
 d.encoding <- subset(arnold2013, group == "encoding")
-EQNfile <- system.file("MPTmodels/2htsm.eqn", package = "TreeBUGS")
-tmp <- read_mpt(EQNfile)
-htsm_restr <- read.MPT.restrictions(list("D1=D2=D3", "d1=d2", "a=g"))
-tmp <- apply.restrictions(tmp, htsm_restr)
-
-# tmp <- TreeBUGS::readEQN(EQNfile,
-#                          restrictions = list("D1=D2=D3", "d1=d2", "a=g"), parse = TRUE)
-
-
-mp <- parse_model_df(tmp)
-cat(paste0(find.MPT.params(mp), "_mu = 0", collapse = ",\n"), ",\n",
-    paste0(find.MPT.params(mp), "_sd = 1", collapse = ",\n"), ",\n",
-    paste0(find.MPT.params(mp), "_u = rep(0, nsubj)", collapse = ",\n"))
-
-# sum(dnorm(a, mean=mua, sd=sda, log=TRUE)
-tmpars <- find.MPT.params(mp)
-cat(paste0("nll <- nll - sum(dnorm(",
-           tmpars, "_u, mean=",
-           tmpars, "_mu, sd=",
-           tmpars, "_sd, log=TRUE))",
-           collapse = "\n"))
-
-cat(paste0(tmpars, " <- pnorm(", tmpars, "_u)",
-           collapse = "\n"))
-
-cat(make_model_equations(tmp, index = "i"))
 
 nsubj <- nrow(d.encoding)
 parameters <- list(
@@ -47,9 +21,9 @@ parameters <- list(
 )
 
 dlist <- list(
-  data1 = as.matrix(d.encoding[,attr(mp, "cat_map")[[1]]]),
-  data2 = as.matrix(d.encoding[,attr(mp, "cat_map")[[2]]]),
-  data3 = as.matrix(d.encoding[,attr(mp, "cat_map")[[3]]])
+  data1 = as.matrix(d.encoding[,c("EE", "EN", "EU")]),
+  data2 = as.matrix(d.encoding[,c("NE", "NN", "NU")]),
+  data3 = as.matrix(d.encoding[,c("UE", "UN", "UU")])
 )
 str(dlist)
 
@@ -98,19 +72,21 @@ fmulti <- function(parms) {
   nll
 }
 
-fmulti(parameters)
+fmulti(parameters) ## just check if it works
 
-obj <- MakeADFun(fmulti, parameters, random = paste0(tmpars, "_u"))
+obj <- MakeADFun(fmulti, parameters, random = paste0(c("b", "d2", "D3", "g"), "_u"))
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 #zapsmall(opt_multi$par)
 sdr_multi <- sdreport(obj)
 sdr_multi
 #summary(sdr_multi)
 round(sdr_multi$par.fixed, 2)
+#  b_mu d2_mu D3_mu  g_mu  b_sd d2_sd D3_sd  g_sd
+# -0.15  0.41 -0.68  0.26  0.48  0.00  0.10  0.59
+### b, a/g, D3/D1 basically match below, d2/d1 is a bit off.
 
 
-
-
+EQNfile <- system.file("MPTmodels/2htsm.eqn", package = "TreeBUGS")
 fit <- TreeBUGS::traitMPT(EQNfile, d.encoding,
   n.thin = 5,
   restrictions = list("D1=D2=D3", "d1=d2", "a=g")
